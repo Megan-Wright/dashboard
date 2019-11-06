@@ -77,11 +77,11 @@ function isFetching(state = false, action) {
   }
 }
 
-function errorMessage(state = null, action) {
+function errorMessage(state = false, action) {
   switch (action.type) {
     case 'SECRETS_FETCH_FAILURE':
     case 'SECRET_CREATE_FAILURE':
-      return action.error;
+      return 'The server reported a conflict';
     case 'SECRETS_FETCH_REQUEST':
     case 'SECRETS_FETCH_SUCCESS':
     case 'CLEAR_SECRET_ERROR_NOTIFICATION':

@@ -12,11 +12,15 @@ limitations under the License.
 */
 
 import React from 'react';
-import { fireEvent } from 'react-testing-library';
+import { fireEvent, render } from 'react-testing-library';
 import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
 import thunk from 'redux-thunk';
-import { renderWithIntl, rerenderWithIntl } from '../../utils/test';
+// import {
+//   SSL_OP_CIPHER_SERVER_PREFERENCE,
+//   SSL_OP_EPHEMERAL_RSA
+// } from 'constants';
+import { renderWithIntl, rerenderWithIntl} from '../../utils/test';
 import SecretsModal from '.';
 import * as API from '../../api';
 
@@ -30,6 +34,19 @@ const secrets = {
   byNamespace: {},
   errorMessage: null,
   isFetching: false
+};
+
+const byNamespace = {
+  default: [
+    {
+      uid: '0',
+      name: 'github-repo-access-secret',
+      type: 'userpass',
+      annotations: {
+        'tekton.dev/git-0': 'https://github.ibm.com'
+      }
+    }
+  ]
 };
 
 const namespaces = {
@@ -50,7 +67,7 @@ const namespaces = {
 };
 
 const serviceAccountsByNamespace = {
-  blue: {
+  default: {
     'service-account-1': 'id-service-account-1',
     'service-account-2': 'id-service-account-2'
   },
@@ -63,14 +80,14 @@ const serviceAccountsById = {
   'id-service-account-1': {
     metadata: {
       name: 'service-account-1',
-      namespace: 'blue',
+      namespace: 'default',
       uid: 'id-service-account-1'
     }
   },
   'id-service-account-2': {
     metadata: {
       name: 'service-account-2',
-      namespace: 'blue',
+      namespace: 'default',
       uid: 'id-service-account-2'
     }
   },
@@ -83,7 +100,7 @@ const serviceAccountsById = {
   }
 };
 
-const store = mockStore({
+let store = mockStore({
   secrets,
   namespaces,
   notifications: {},
@@ -113,11 +130,11 @@ it('SecretsModal renders blank', () => {
 });
 
 it('Test SecretsModal click events', () => {
-  const handleNew = jest.fn();
+  const handleHideModal = jest.fn();
   const handleSubmit = jest.fn();
   const props = {
     open: true,
-    handleNew
+    handleHideModal
   };
 
   jest.spyOn(API, 'getNamespaces').mockImplementation(() => []);
@@ -129,7 +146,8 @@ it('Test SecretsModal click events', () => {
     </Provider>
   );
   fireEvent.click(queryByText('Close'));
-  expect(handleNew).toHaveBeenCalledTimes(1);
+  expect(handleHideModal).toHaveBeenCalledTimes(1);
+
   rerenderWithIntl(
     rerender,
     <Provider store={store}>
@@ -448,4 +466,51 @@ it("Create Secret doesn't error when a password is entered", () => {
   expect(queryByText(passwordValidationErrorRegExp)).toBeFalsy();
   expect(queryByText(serviceAccountValidationErrorRegExp)).toBeTruthy();
   expect(queryByText(serverurlValidationErrorRegExp)).toBeFalsy();
+});
+
+it('error notification appears', () => {
+  store = mockStore({
+    secrets: {
+      byNamespace,
+      isFetching: false,
+      errorMessage: 'Some error message'
+    },
+    namespaces,
+    notifications: {},
+    serviceAccount: 'service-account-1',
+    serviceAccounts: {
+      byId: serviceAccountsById,
+      byNamespace: serviceAccountsByNamespace,
+      isFetching: false
+    }
+  });
+
+  jest.spyOn(API, 'getNamespaces').mockImplementation(() => []);
+  jest
+    .spyOn(API, 'getServiceAccounts')
+    .mockImplementation(() => ['service-account-1']);
+
+  const { getByTestId, getByPlaceholderText, getByText, queryByText } = render(
+    <Provider store={store}>
+      <SecretsModal {...props} />
+    </Provider>
+  );
+
+  fireEvent.change(getByPlaceholderText(/secret-name/i), {
+    target: { value: 'test-secret' }
+  });
+  fireEvent.click(getByText(/select namespace/i));
+  fireEvent.click(getByText(/default/i));
+
+  fireEvent.change(getByPlaceholderText(/username/i), {
+    target: { value: 'test-name' }
+  });
+  fireEvent.change(getByPlaceholderText(/\*\*\*\*\*\*\*\*/i), {
+    target: { value: 'test-password' }
+  });
+  fireEvent.click(getByText(/select service account/i));
+  fireEvent.click(getByText(/service-account-1/i));
+  fireEvent.click(queryByText(/submit/i));
+
+  expect(getByTestId('errorNotificationCompnent')).toBeTruthy();
 });

@@ -15,7 +15,6 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { injectIntl } from 'react-intl';
 import { InlineNotification } from 'carbon-components-react';
-import { getErrorMessage } from '@tektoncd/dashboard-utils';
 
 import Modal from '../SecretsModal';
 import DeleteModal from '../../components/SecretsDeleteModal';
@@ -45,6 +44,7 @@ export /* istanbul ignore next */ class Secrets extends Component {
   constructor(props) {
     super(props);
     this.state = initialState;
+    this.handleCreateSecretClick = this.handleCreateSecretClick.bind(this);
   }
 
   componentDidMount() {
@@ -59,10 +59,12 @@ export /* istanbul ignore next */ class Secrets extends Component {
     }
   }
 
-  handleNewSecretClick = () => {
+  handleDisplayModalClick = () => {
+    this.props.clearNotification();
     this.setState(prevState => {
       return {
-        openNewSecret: !prevState.openNewSecret
+        openNewSecret: !prevState.openNewSecret,
+        errorMessage: ''
       };
     });
   };
@@ -71,6 +73,13 @@ export /* istanbul ignore next */ class Secrets extends Component {
     this.setState({
       openDeleteSecret: false,
       toBeDeleted: []
+    });
+  };
+
+  handleHideModalClick = () => {
+    this.props.clearNotification();
+    this.setState({
+      openNewSecret: false
     });
   };
 
@@ -86,32 +95,32 @@ export /* istanbul ignore next */ class Secrets extends Component {
     this.handleDeleteSecretToggle();
   };
 
+  handleCreateSecretClick(result) {
+    if (result) {
+      this.setState({
+        openNewSecret: true
+      });
+    } else {
+      this.setState({
+        openNewSecret: false
+      });
+    }
+  }
+
   render() {
     const {
       loading,
-      error,
       createSuccess,
       deleteSuccess,
       secrets,
       selectedNamespace,
-      intl
+      intl,
+      errorMessage
     } = this.props;
 
     const { openNewSecret, toBeDeleted, openDeleteSecret } = this.state;
     return (
       <>
-        {error && (
-          <InlineNotification
-            kind="error"
-            title="Error:"
-            subtitle={getErrorMessage(error)}
-            iconDescription="Clear Notification"
-            className="notificationComponent"
-            data-testid="errorNotificationComponent"
-            onCloseButtonClick={this.props.clearNotification}
-            lowContrast
-          />
-        )}
         {createSuccess &&
           (!deleteSuccess && (
             <InlineNotification
@@ -154,16 +163,18 @@ export /* istanbul ignore next */ class Secrets extends Component {
           />
         )}
         <Table
-          handleNew={this.handleNewSecretClick}
+          handleDisplayModal={this.handleDisplayModalClick}
           handleDelete={this.handleDeleteSecretClick}
           loading={loading}
           secrets={secrets}
           selectedNamespace={selectedNamespace}
         />
         <Modal
+          errorMessage={errorMessage}
           open={openNewSecret}
           key={openNewSecret}
-          handleNew={this.handleNewSecretClick}
+          handleCreateSecret={this.handleCreateSecretClick}
+          handleHideModal={this.handleHideModalClick}
         />
         <DeleteModal
           open={openDeleteSecret}
@@ -182,7 +193,7 @@ Secrets.defaultProps = {
 
 function mapStateToProps(state) {
   return {
-    error: getSecretsErrorMessage(state),
+    errorMessage: getSecretsErrorMessage(state),
     createSuccess: getCreateSecretsSuccessMessage(state),
     deleteSuccess: getDeleteSecretsSuccessMessage(state),
     loading: isFetchingSecrets(state),

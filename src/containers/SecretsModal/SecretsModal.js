@@ -11,16 +11,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { generateId, getErrorMessage } from '@tektoncd/dashboard-utils';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
-import { Modal } from 'carbon-components-react';
-import { generateId } from '@tektoncd/dashboard-utils';
+
 import { KeyValueList } from '@tektoncd/dashboard-components';
 import { injectIntl } from 'react-intl';
+import { InlineNotification, Modal } from 'carbon-components-react';
 import UniversalFields from '../../components/SecretsModal/UniversalFields';
 import BasicAuthFields from '../../components/SecretsModal/BasicAuthFields';
 import { createSecret } from '../../actions/secrets';
-import { isWebSocketConnected } from '../../reducers';
+import { getSecretsErrorMessage, isWebSocketConnected } from '../../reducers';
 import { fetchServiceAccounts } from '../../actions/serviceAccounts';
 
 import '../../components/SecretsModal/SecretsModal.scss';
@@ -112,7 +113,7 @@ export /* istanbul ignore next */ class SecretsModal extends Component {
     this.annotationsEnd.scrollIntoView({ behavior: 'auto' });
   };
 
-  handleSubmit = () => {
+  handleSubmit = async () => {
     const invalidFields = {};
     const postData = {
       apiVersion: 'v1',
@@ -186,10 +187,10 @@ export /* istanbul ignore next */ class SecretsModal extends Component {
       annotationsObject[key] = value;
     }
     postData.metadata.annotations = annotationsObject;
-
     if (Object.keys(invalidFields).length === 0) {
-      this.props.createSecret(postData, namespace);
-      this.props.handleNew();
+      await this.props.createSecret(postData, namespace).then(result => {
+        this.props.handleCreateSecret(result);
+      });
     } else {
       this.setState({ invalidFields });
     }
@@ -356,7 +357,7 @@ export /* istanbul ignore next */ class SecretsModal extends Component {
   };
 
   render() {
-    const { open, handleNew, intl } = this.props;
+    const { open, handleHideModal, errorMessage, intl } = this.props;
     const { serviceAccounts } = this.state;
     const {
       name,
@@ -370,68 +371,83 @@ export /* istanbul ignore next */ class SecretsModal extends Component {
     } = this.state;
 
     return (
-      <Modal
-        open={open}
-        className="modal"
-        data-testid="modal"
-        primaryButtonText="Submit"
-        secondaryButtonText="Close"
-        modalHeading="Create Secret"
-        onSecondarySubmit={handleNew}
-        onRequestSubmit={this.handleSubmit}
-        onRequestClose={handleNew}
-      >
-        <form>
-          <UniversalFields
-            name={name}
-            selectedNamespace={namespace}
-            accessTo={accessTo}
-            handleChangeTextInput={this.handleChangeTextInput}
-            handleChangeAccessTo={this.handleChangeAccessTo}
-            handleChangeNamespace={this.handleChangeNamespace}
-            invalidFields={invalidFields}
-          />
-          <BasicAuthFields
-            username={username}
-            password={password}
-            serviceAccount={serviceAccount}
-            serviceAccounts={serviceAccounts}
-            namespace={namespace}
-            handleChangeTextInput={this.handleChangeTextInput}
-            handleChangeServiceAccount={this.handleChangeServiceAccount}
-            invalidFields={invalidFields}
-          />
-          <KeyValueList
-            legendText={intl.formatMessage({
-              id: 'dashboard.secretsModal.annotations.legendText',
-              defaultMessage: 'Server URL'
-            })}
-            invalidText={intl.formatMessage({
-              id: 'dashboard.secretsModal.annotations.invalidText',
-              defaultMessage: 'Server URL required.'
-            })}
-            ariaLabelKey={intl.formatMessage({
-              id: 'dashboard.secretsModal.annotations.ariaLabelKey',
-              defaultMessage: 'This is the tag Tekton uses for its resources.'
-            })}
-            ariaLabelValue={intl.formatMessage({
-              id: 'dashboard.secretsModal.annotations.ariaLabelValue',
-              defaultMessage: 'This is the URL for the given Tekton resource.'
-            })}
-            keyValues={annotations}
-            minKeyValues={1}
-            invalidFields={invalidFields}
-            onChange={this.handleAnnotationChange}
-            onRemove={this.handleRemove}
-            onAdd={this.handleAdd}
-          />
-          <div
-            ref={el => {
-              this.annotationsEnd = el;
-            }}
-          />
-        </form>
-      </Modal>
+      <>
+        <Modal
+          open={open}
+          className="modal"
+          data-testid="modal"
+          primaryButtonText="Submit"
+          secondaryButtonText="Close"
+          modalHeading="Create Secret"
+          onSecondarySubmit={handleHideModal}
+          onRequestSubmit={this.handleSubmit}
+          onRequestClose={handleHideModal}
+        >
+          <form>
+            <UniversalFields
+              name={name}
+              selectedNamespace={namespace}
+              accessTo={accessTo}
+              handleChangeTextInput={this.handleChangeTextInput}
+              handleChangeAccessTo={this.handleChangeAccessTo}
+              handleChangeNamespace={this.handleChangeNamespace}
+              invalidFields={invalidFields}
+            />
+            <BasicAuthFields
+              username={username}
+              password={password}
+              serviceAccount={serviceAccount}
+              serviceAccounts={serviceAccounts}
+              namespace={namespace}
+              handleChangeTextInput={this.handleChangeTextInput}
+              handleChangeServiceAccount={this.handleChangeServiceAccount}
+              invalidFields={invalidFields}
+            />
+            <KeyValueList
+              legendText={intl.formatMessage({
+                id: 'dashboard.secretsModal.annotations.legendText',
+                defaultMessage: 'Server URL'
+              })}
+              invalidText={intl.formatMessage({
+                id: 'dashboard.secretsModal.annotations.invalidText',
+                defaultMessage: 'Server URL required.'
+              })}
+              ariaLabelKey={intl.formatMessage({
+                id: 'dashboard.secretsModal.annotations.ariaLabelKey',
+                defaultMessage: 'This is the tag Tekton uses for its resources.'
+              })}
+              ariaLabelValue={intl.formatMessage({
+                id: 'dashboard.secretsModal.annotations.ariaLabelValue',
+                defaultMessage: 'This is the URL for the given Tekton resource.'
+              })}
+              keyValues={annotations}
+              minKeyValues={1}
+              invalidFields={invalidFields}
+              onChange={this.handleAnnotationChange}
+              onRemove={this.handleRemove}
+              onAdd={this.handleAdd}
+            />
+            {errorMessage &&
+              (open && (
+                <InlineNotification
+                  kind="error"
+                  title="Error:"
+                  subtitle={getErrorMessage(errorMessage)}
+                  iconDescription="Clear Notification"
+                  className="notificationComponent"
+                  data-testid="errorNotificationComponent"
+                  onCloseButtonClick={this.props.clearNotification}
+                  lowContrast
+                />
+              ))}
+            <div
+              ref={el => {
+                this.annotationsEnd = el;
+              }}
+            />
+          </form>
+        </Modal>
+      </>
     );
   }
 }
@@ -442,6 +458,7 @@ SecretsModal.defaultProps = {
 
 function mapStateToProps(state) {
   return {
+    errorMessage: getSecretsErrorMessage(state),
     webSocketConnected: isWebSocketConnected(state)
   };
 }
