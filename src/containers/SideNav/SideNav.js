@@ -253,24 +253,40 @@ class SideNav extends Component {
           >
             &nbsp;
           </SideNavMenuItem>
-          <SideNavLink element={NavLink} icon={<span />} to={urls.about()}>
-            {intl.formatMessage({
-              id: 'dashboard.sideNav.about',
-              defaultMessage: 'About'
-            })}
-          </SideNavLink>
 
           {!this.props.isReadOnly && (
-            <SideNavLink
-              element={NavLink}
-              icon={<span />}
-              to={urls.importResources()}
-            >
-              {intl.formatMessage({
-                id: 'dashboard.sideNav.importResources',
-                defaultMessage: 'Import Tekton resources'
+            <SideNavMenu
+              defaultExpanded
+              title={intl.formatMessage({
+                id: 'dashboard.sideNav.kubernetesResources',
+                defaultMessage: 'Kubernetes resources'
               })}
-            </SideNavLink>
+            >
+              <SideNavMenuItem
+                element={NavLink}
+                icon={<span />}
+                to={this.getPath(urls.secrets.all())}
+              >
+                Secrets
+              </SideNavMenuItem>
+              <SideNavMenuItem
+                element={NavLink}
+                icon={<span />}
+                to={this.getPath(urls.serviceAccounts.all())}
+              >
+                ServiceAccounts
+              </SideNavMenuItem>
+            </SideNavMenu>
+          )}
+
+          {extensions.length > 0 && (
+            <SideNavMenu
+              defaultExpanded
+              title={intl.formatMessage({
+                id: 'dashboard.extensions.title',
+                defaultMessage: 'Extensions'
+              })}
+            />
           )}
 
           <SideNavLink
